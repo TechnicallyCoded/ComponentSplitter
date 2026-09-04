@@ -21,8 +21,10 @@ class ComponentSplitterTest {
         List<Component> lines = ComponentSplitter.restructureMultiLine(List.of(component));
 
         assertEquals(2, lines.size());
-        assertEquals(TextDecoration.State.TRUE,
-                decorationForText(lines.get(1), " ", Style.empty(), TextDecoration.STRIKETHROUGH));
+        assertEquals(
+                TextDecoration.State.TRUE,
+                decorationForText(lines.get(1), " ", Style.empty(), TextDecoration.STRIKETHROUGH)
+        );
     }
 
     @Test
@@ -33,8 +35,10 @@ class ComponentSplitterTest {
 
         List<Component> lines = ComponentSplitter.restructureMultiLine(List.of(component));
 
-        assertEquals(TextDecoration.State.FALSE,
-                decorationForText(lines.get(1), "child", Style.empty(), TextDecoration.STRIKETHROUGH));
+        assertEquals(
+                TextDecoration.State.FALSE,
+                decorationForText(lines.get(1), "child", Style.empty(), TextDecoration.STRIKETHROUGH)
+        );
     }
 
     @Test
@@ -44,10 +48,34 @@ class ComponentSplitterTest {
 
         List<Component> lines = ComponentSplitter.restructureMultiLine(List.of(component));
 
-        assertEquals(TextDecoration.State.TRUE,
-                decorationForText(lines.get(1), "second", Style.empty(), TextDecoration.STRIKETHROUGH));
-        assertEquals(TextDecoration.State.NOT_SET,
-                decorationForText(lines.get(2), "third", Style.empty(), TextDecoration.STRIKETHROUGH));
+        assertEquals(
+                TextDecoration.State.TRUE,
+                decorationForText(lines.get(1), "second", Style.empty(), TextDecoration.STRIKETHROUGH)
+        );
+        assertEquals(
+                TextDecoration.State.FALSE,
+                decorationForText(lines.get(2), "third", Style.empty(), TextDecoration.STRIKETHROUGH)
+        );
+    }
+
+    @Test
+    void lineWrapperDisablesDefaultItalics() {
+        List<Component> lines = ComponentSplitter.restructureMultiLine(List.of(Component.text("line")));
+
+        assertEquals(TextDecoration.State.FALSE, lines.getFirst().decoration(TextDecoration.ITALIC));
+    }
+
+    @Test
+    void explicitChildItalicsOverrideLineWrapper() {
+        Component component = Component.empty()
+                .append(Component.text("italic").decoration(TextDecoration.ITALIC, true));
+
+        List<Component> lines = ComponentSplitter.restructureMultiLine(List.of(component));
+
+        assertEquals(
+                TextDecoration.State.TRUE,
+                decorationForText(lines.getFirst(), "italic", Style.empty(), TextDecoration.ITALIC)
+        );
     }
 
     private static TextDecoration.State decorationForText(
@@ -63,7 +91,9 @@ class ComponentSplitterTest {
 
         for (Component child : component.children()) {
             TextDecoration.State state = decorationForText(child, expectedText, effectiveStyle, decoration);
-            if (state != TextDecoration.State.NOT_SET) return state;
+            if (state != TextDecoration.State.NOT_SET) {
+                return state;
+            }
         }
         return TextDecoration.State.NOT_SET;
     }
