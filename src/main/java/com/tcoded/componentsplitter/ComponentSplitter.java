@@ -2,6 +2,8 @@ package com.tcoded.componentsplitter;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.format.Style;
+import net.kyori.adventure.text.format.TextDecoration;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,9 +20,9 @@ public class ComponentSplitter {
             if (hasNewLine(originalLine)) {
                 Ref<MutableComponent> workingStack = new Ref<>(null);
                 MutableComponent lastPart = appendRecursive(lines, workingStack, originalLine);
-                lines.add(lastPart.root().build());
+                lines.add(wrapLine(lastPart.root().build()));
             } else {
-                lines.add(originalLine);
+                lines.add(wrapLine(originalLine));
             }
         }
 
@@ -59,6 +61,7 @@ public class ComponentSplitter {
         if (original instanceof TextComponent text) {
             String content = text.content();
             StringBuilder sb = new StringBuilder();
+            boolean preserveDecorations = true;
 
             for (int i = 0; i < content.length(); i++) {
                 char c = content.charAt(i);
@@ -67,14 +70,15 @@ public class ComponentSplitter {
                     String line = sb.toString();
                     sb = new StringBuilder(); // Reset the StringBuilder for the next section
 
-                    Component textPart = applyFormatting(original, line);
+                    Component textPart = applyFormatting(original, line, preserveDecorations);
                     cwc.setBase(textPart);
 
-                    lines.add(cwc.root().build());
+                    lines.add(wrapLine(cwc.root().build()));
 
                     // Rebuild a new cwc for the next line
                     cwc = cwc.copyStylesOnly();
                     workingStack.set(cwc);
+                    preserveDecorations = false;
 
                     continue;
                 }
@@ -85,7 +89,7 @@ public class ComponentSplitter {
                 if (i >= content.length() - 1) {
                     String line = sb.toString();
 
-                    Component textPart = applyFormatting(original, line);
+                    Component textPart = applyFormatting(original, line, preserveDecorations);
                     cwc.setBase(textPart);
                 }
 
@@ -103,27 +107,41 @@ public class ComponentSplitter {
         return cwc;
     }
 
-    private static Component applyFormatting(Component template, String line) {
-        // Merge selectively to avoid inheriting unwanted decorations like strikethrough
-        var templateStyle = template.style();
-        var style = net.kyori.adventure.text.format.Style.empty();
+    private static Component applyFormatting(Component template, String line, boolean preserveDecorations) {
+        Style templateStyle = template.style();
+        Style style = Style.empty();
         if (templateStyle.color() != null) style = style.color(templateStyle.color());
         if (templateStyle.font() != null) style = style.font(templateStyle.font());
-        // Preserve allowed decorations
-        if (templateStyle.decoration(net.kyori.adventure.text.format.TextDecoration.BOLD) == net.kyori.adventure.text.format.TextDecoration.State.TRUE) {
-            style = style.decoration(net.kyori.adventure.text.format.TextDecoration.BOLD, net.kyori.adventure.text.format.TextDecoration.State.TRUE);
+        if (preserveDecorations) {
+            style = copyDecoration(templateStyle, style, TextDecoration.BOLD);
+            style = copyDecoration(templateStyle, style, TextDecoration.ITALIC);
+            style = copyDecoration(templateStyle, style, TextDecoration.UNDERLINED);
+            style = copyDecoration(templateStyle, style, TextDecoration.STRIKETHROUGH);
+            style = copyDecoration(templateStyle, style, TextDecoration.OBFUSCATED);
         }
-        if (templateStyle.decoration(net.kyori.adventure.text.format.TextDecoration.UNDERLINED) == net.kyori.adventure.text.format.TextDecoration.State.TRUE) {
-            style = style.decoration(net.kyori.adventure.text.format.TextDecoration.UNDERLINED, net.kyori.adventure.text.format.TextDecoration.State.TRUE);
-        }
-        // Explicitly disable strikethrough and obfuscated
-        style = style.decoration(net.kyori.adventure.text.format.TextDecoration.STRIKETHROUGH, net.kyori.adventure.text.format.TextDecoration.State.FALSE)
-                     .decoration(net.kyori.adventure.text.format.TextDecoration.OBFUSCATED, net.kyori.adventure.text.format.TextDecoration.State.FALSE);
-        // Preserve click/hover events if present
+
         return Component.text(line)
                 .style(style)
                 .clickEvent(template.clickEvent())
                 .hoverEvent(template.hoverEvent());
+    }
+
+    private static Style copyDecoration(Style source, Style target, TextDecoration decoration) {
+        TextDecoration.State state = source.decoration(decoration);
+        if (state == TextDecoration.State.NOT_SET) {
+            return target;
+        }
+        return target.decoration(decoration, state);
+    }
+
+    private static Component wrapLine(Component line) {
+        return Component.empty()
+                .decoration(TextDecoration.BOLD, false)
+                .decoration(TextDecoration.ITALIC, false)
+                .decoration(TextDecoration.UNDERLINED, false)
+                .decoration(TextDecoration.STRIKETHROUGH, false)
+                .decoration(TextDecoration.OBFUSCATED, false)
+                .append(line);
     }
 
 }
