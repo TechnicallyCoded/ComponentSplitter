@@ -16,12 +16,13 @@ public class ComponentSplitter {
         List<Component> lines = new ArrayList<>();
 
         for (Component originalLine : originalLines) {
+            // Has new line?
             if (hasNewLine(originalLine)) {
                 Ref<MutableComponent> workingStack = new Ref<>(null);
                 MutableComponent lastPart = appendRecursive(lines, workingStack, originalLine);
-                lines.add(lastPart.root().build());
+                lines.add(wrapLine(lastPart.root().build()));
             } else {
-                lines.add(originalLine);
+                lines.add(wrapLine(originalLine));
             }
         }
 
@@ -43,6 +44,8 @@ public class ComponentSplitter {
     public static MutableComponent appendRecursive(List<Component> lines, Ref<MutableComponent> workingStack, Component original) {
         Objects.requireNonNull(original, "Component cannot be null");
 
+        // Push this component onto the working stack
+        // cwc = Current working component
         MutableComponent cwc = workingStack.get();
         MutableComponent parent = cwc;
 
@@ -50,10 +53,11 @@ public class ComponentSplitter {
         cwc = new MutableComponent(cwc, originalNoChildren);
 
         if (parent != null) parent.appendChild(cwc);
-        parent = null;
+        parent = null; // Delete to avoid bookkeeping the parent reference
 
         workingStack.set(cwc);
 
+        // Build the components
         if (original instanceof TextComponent text) {
             String content = text.content();
             StringBuilder sb = new StringBuilder();
@@ -64,13 +68,14 @@ public class ComponentSplitter {
 
                 if (c == '\n') {
                     String line = sb.toString();
-                    sb = new StringBuilder();
+                    sb = new StringBuilder(); // Reset the StringBuilder for the next section
 
                     Component textPart = applyFormatting(original, line, preserveDecorations);
                     cwc.setBase(textPart);
 
-                    lines.add(cwc.root().build());
+                    lines.add(wrapLine(cwc.root().build()));
 
+                    // Rebuild a new cwc for the next line
                     cwc = cwc.copyStylesOnly();
                     workingStack.set(cwc);
                     preserveDecorations = false;
@@ -80,6 +85,7 @@ public class ComponentSplitter {
 
                 sb.append(c);
 
+                // Apply any remaining text
                 if (i >= content.length() - 1) {
                     String line = sb.toString();
 
@@ -90,10 +96,12 @@ public class ComponentSplitter {
             }
         }
 
+        // Append children recursively
         for (Component child : original.children()) {
             appendRecursive(lines, workingStack, child);
         }
 
+        // Pop the current working component
         cwc = workingStack.get();
         workingStack.set(cwc.getParent());
         return cwc;
@@ -124,6 +132,16 @@ public class ComponentSplitter {
             return target;
         }
         return target.decoration(decoration, state);
+    }
+
+    private static Component wrapLine(Component line) {
+        return Component.empty()
+                .decoration(TextDecoration.BOLD, false)
+                .decoration(TextDecoration.ITALIC, false)
+                .decoration(TextDecoration.UNDERLINED, false)
+                .decoration(TextDecoration.STRIKETHROUGH, false)
+                .decoration(TextDecoration.OBFUSCATED, false)
+                .append(line);
     }
 
 }
