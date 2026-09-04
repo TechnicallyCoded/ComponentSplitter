@@ -57,6 +57,7 @@ public class ComponentSplitter {
         if (original instanceof TextComponent text) {
             String content = text.content();
             StringBuilder sb = new StringBuilder();
+            boolean preserveDecorations = true;
 
             for (int i = 0; i < content.length(); i++) {
                 char c = content.charAt(i);
@@ -65,13 +66,14 @@ public class ComponentSplitter {
                     String line = sb.toString();
                     sb = new StringBuilder();
 
-                    Component textPart = applyFormatting(original, line);
+                    Component textPart = applyFormatting(original, line, preserveDecorations);
                     cwc.setBase(textPart);
 
                     lines.add(cwc.root().build());
 
                     cwc = cwc.copyStylesOnly();
                     workingStack.set(cwc);
+                    preserveDecorations = false;
 
                     continue;
                 }
@@ -81,7 +83,7 @@ public class ComponentSplitter {
                 if (i >= content.length() - 1) {
                     String line = sb.toString();
 
-                    Component textPart = applyFormatting(original, line);
+                    Component textPart = applyFormatting(original, line, preserveDecorations);
                     cwc.setBase(textPart);
                 }
 
@@ -97,16 +99,18 @@ public class ComponentSplitter {
         return cwc;
     }
 
-    private static Component applyFormatting(Component template, String line) {
+    private static Component applyFormatting(Component template, String line, boolean preserveDecorations) {
         Style templateStyle = template.style();
         Style style = Style.empty();
         if (templateStyle.color() != null) style = style.color(templateStyle.color());
         if (templateStyle.font() != null) style = style.font(templateStyle.font());
-        style = copyDecoration(templateStyle, style, TextDecoration.BOLD);
-        style = copyDecoration(templateStyle, style, TextDecoration.ITALIC);
-        style = copyDecoration(templateStyle, style, TextDecoration.UNDERLINED);
-        style = copyDecoration(templateStyle, style, TextDecoration.STRIKETHROUGH);
-        style = copyDecoration(templateStyle, style, TextDecoration.OBFUSCATED);
+        if (preserveDecorations) {
+            style = copyDecoration(templateStyle, style, TextDecoration.BOLD);
+            style = copyDecoration(templateStyle, style, TextDecoration.ITALIC);
+            style = copyDecoration(templateStyle, style, TextDecoration.UNDERLINED);
+            style = copyDecoration(templateStyle, style, TextDecoration.STRIKETHROUGH);
+            style = copyDecoration(templateStyle, style, TextDecoration.OBFUSCATED);
+        }
 
         return Component.text(line)
                 .style(style)
