@@ -2,6 +2,8 @@ package com.tcoded.componentsplitter;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.format.Style;
+import net.kyori.adventure.text.format.TextDecoration;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +16,6 @@ public class ComponentSplitter {
         List<Component> lines = new ArrayList<>();
 
         for (Component originalLine : originalLines) {
-            // Has new line?
             if (hasNewLine(originalLine)) {
                 Ref<MutableComponent> workingStack = new Ref<>(null);
                 MutableComponent lastPart = appendRecursive(lines, workingStack, originalLine);
@@ -42,8 +43,6 @@ public class ComponentSplitter {
     public static MutableComponent appendRecursive(List<Component> lines, Ref<MutableComponent> workingStack, Component original) {
         Objects.requireNonNull(original, "Component cannot be null");
 
-        // Push this component onto the working stack
-        // cwc = Current working component
         MutableComponent cwc = workingStack.get();
         MutableComponent parent = cwc;
 
@@ -51,11 +50,10 @@ public class ComponentSplitter {
         cwc = new MutableComponent(cwc, originalNoChildren);
 
         if (parent != null) parent.appendChild(cwc);
-        parent = null; // Delete to avoid bookkeeping the parent reference
+        parent = null;
 
         workingStack.set(cwc);
 
-        // Build the components
         if (original instanceof TextComponent text) {
             String content = text.content();
             StringBuilder sb = new StringBuilder();
@@ -65,14 +63,13 @@ public class ComponentSplitter {
 
                 if (c == '\n') {
                     String line = sb.toString();
-                    sb = new StringBuilder(); // Reset the StringBuilder for the next section
+                    sb = new StringBuilder();
 
                     Component textPart = applyFormatting(original, line);
                     cwc.setBase(textPart);
 
                     lines.add(cwc.root().build());
 
-                    // Rebuild a new cwc for the next line
                     cwc = cwc.copyStylesOnly();
                     workingStack.set(cwc);
 
@@ -81,7 +78,6 @@ public class ComponentSplitter {
 
                 sb.append(c);
 
-                // Apply any remaining text
                 if (i >= content.length() - 1) {
                     String line = sb.toString();
 
@@ -92,38 +88,38 @@ public class ComponentSplitter {
             }
         }
 
-        // Append children recursively
         for (Component child : original.children()) {
             appendRecursive(lines, workingStack, child);
         }
 
-        // Pop the current working component
         cwc = workingStack.get();
         workingStack.set(cwc.getParent());
         return cwc;
     }
 
     private static Component applyFormatting(Component template, String line) {
-        // Merge selectively to avoid inheriting unwanted decorations like strikethrough
-        var templateStyle = template.style();
-        var style = net.kyori.adventure.text.format.Style.empty();
+        Style templateStyle = template.style();
+        Style style = Style.empty();
         if (templateStyle.color() != null) style = style.color(templateStyle.color());
         if (templateStyle.font() != null) style = style.font(templateStyle.font());
-        // Preserve allowed decorations
-        if (templateStyle.decoration(net.kyori.adventure.text.format.TextDecoration.BOLD) == net.kyori.adventure.text.format.TextDecoration.State.TRUE) {
-            style = style.decoration(net.kyori.adventure.text.format.TextDecoration.BOLD, net.kyori.adventure.text.format.TextDecoration.State.TRUE);
-        }
-        if (templateStyle.decoration(net.kyori.adventure.text.format.TextDecoration.UNDERLINED) == net.kyori.adventure.text.format.TextDecoration.State.TRUE) {
-            style = style.decoration(net.kyori.adventure.text.format.TextDecoration.UNDERLINED, net.kyori.adventure.text.format.TextDecoration.State.TRUE);
-        }
-        // Explicitly disable strikethrough and obfuscated
-        style = style.decoration(net.kyori.adventure.text.format.TextDecoration.STRIKETHROUGH, net.kyori.adventure.text.format.TextDecoration.State.FALSE)
-                     .decoration(net.kyori.adventure.text.format.TextDecoration.OBFUSCATED, net.kyori.adventure.text.format.TextDecoration.State.FALSE);
-        // Preserve click/hover events if present
+        style = copyDecoration(templateStyle, style, TextDecoration.BOLD);
+        style = copyDecoration(templateStyle, style, TextDecoration.ITALIC);
+        style = copyDecoration(templateStyle, style, TextDecoration.UNDERLINED);
+        style = copyDecoration(templateStyle, style, TextDecoration.STRIKETHROUGH);
+        style = copyDecoration(templateStyle, style, TextDecoration.OBFUSCATED);
+
         return Component.text(line)
                 .style(style)
                 .clickEvent(template.clickEvent())
                 .hoverEvent(template.hoverEvent());
+    }
+
+    private static Style copyDecoration(Style source, Style target, TextDecoration decoration) {
+        TextDecoration.State state = source.decoration(decoration);
+        if (state == TextDecoration.State.NOT_SET) {
+            return target;
+        }
+        return target.decoration(decoration, state);
     }
 
 }
