@@ -21,10 +21,8 @@ class ComponentSplitterTest {
         List<Component> lines = ComponentSplitter.restructureMultiLine(List.of(component));
 
         assertEquals(2, lines.size());
-        assertEquals(
-                TextDecoration.State.TRUE,
-                decorationForText(lines.get(1), " ", Style.empty(), TextDecoration.STRIKETHROUGH)
-        );
+        assertEquals(TextDecoration.State.TRUE,
+                decorationForText(lines.get(1), " ", Style.empty(), TextDecoration.STRIKETHROUGH));
     }
 
     @Test
@@ -35,10 +33,21 @@ class ComponentSplitterTest {
 
         List<Component> lines = ComponentSplitter.restructureMultiLine(List.of(component));
 
-        assertEquals(
-                TextDecoration.State.FALSE,
-                decorationForText(lines.get(1), "child", Style.empty(), TextDecoration.STRIKETHROUGH)
-        );
+        assertEquals(TextDecoration.State.FALSE,
+                decorationForText(lines.get(1), "child", Style.empty(), TextDecoration.STRIKETHROUGH));
+    }
+
+    @Test
+    void newlineDoesNotCarryStrikethroughIntoTheNextLine() {
+        Component component = Component.text("first\n")
+                .append(Component.text("second\nthird").decoration(TextDecoration.STRIKETHROUGH, true));
+
+        List<Component> lines = ComponentSplitter.restructureMultiLine(List.of(component));
+
+        assertEquals(TextDecoration.State.TRUE,
+                decorationForText(lines.get(1), "second", Style.empty(), TextDecoration.STRIKETHROUGH));
+        assertEquals(TextDecoration.State.NOT_SET,
+                decorationForText(lines.get(2), "third", Style.empty(), TextDecoration.STRIKETHROUGH));
     }
 
     private static TextDecoration.State decorationForText(
@@ -54,9 +63,7 @@ class ComponentSplitterTest {
 
         for (Component child : component.children()) {
             TextDecoration.State state = decorationForText(child, expectedText, effectiveStyle, decoration);
-            if (state != TextDecoration.State.NOT_SET) {
-                return state;
-            }
+            if (state != TextDecoration.State.NOT_SET) return state;
         }
         return TextDecoration.State.NOT_SET;
     }
